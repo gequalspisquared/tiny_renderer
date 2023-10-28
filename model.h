@@ -10,10 +10,10 @@ public:
 	Model(const char* filename);
 	~Model();
 
-	int nverts();
-	int nfaces();
-	Vec3f vert(int idx);
-	std::vector<int> face(int idx);
+	int nverts() const;
+	int nfaces() const;
+	Vec3f vert(int idx) const;
+	std::vector<int> face(int idx) const;
 
 private:
 	std::vector<Vec3f> m_verts;

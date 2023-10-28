@@ -41,18 +41,18 @@ Model::Model(const char *filename) : m_verts() , m_faces() {
 Model::~Model() {
 }
 
-int Model::nverts() {
+int Model::nverts() const {
 	return m_verts.size();
 }
 
-int Model::nfaces() {
+int Model::nfaces() const {
 	return m_faces.size();
 }
 
-Vec3f Model::vert(int idx) {
+Vec3f Model::vert(int idx) const {
 	return m_verts[idx];
 }
 
-std::vector<int> Model::face(int idx) {
+std::vector<int> Model::face(int idx) const {
 	return m_faces[idx];
 }
