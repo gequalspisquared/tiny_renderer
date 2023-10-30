@@ -1,3 +1,4 @@
+#include <limits>
 #include <vector>
 #include <iostream>
 #include <cstdlib>
@@ -13,8 +14,6 @@ const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red   = TGAColor(255, 0,   0,   255);
 const TGAColor green = TGAColor(0,   255, 0,   255);
 const TGAColor blue  = TGAColor(0,   0,   255, 255);
-
-Model *model = nullptr;
 
 void line(int x0, int y0, int x1, int y1, TGAImage &image, const TGAColor &color) {
 	bool steep = false;
@@ -74,6 +73,12 @@ Vec3f barycentric_coordinates(Vec2i v[3], Vec2i P) {
 	return Vec3f(1.f - (w.x + w.y)/w.z, w.y/w.z, w.x/w.z);
 }
 
+Vec3f barycentric_coordinates(Vec3f v[3], Vec3f P) {
+	Vec3f w = Vec3f(v[2].x - v[0].x, v[1].x - v[0].x, v[0].x - P.x) ^ Vec3f(v[2].y - v[0].y, v[1].y - v[0].y, v[0].y - P.y);
+	if (std::abs(w.z) < 1.f) return Vec3f(-1.f, 1.f, 1.f);
+	return Vec3f(1.f - (w.x + w.y)/w.z, w.y/w.z, w.x/w.z);
+}
+
 void triangle(Vec2i vertices[3], TGAImage& image, const TGAColor& color, bool wireframe = false) {
 	Vec2i bboxmin(image.get_width() - 1, image.get_height() - 1);
 	Vec2i bboxmax(0, 0);
@@ -98,12 +103,120 @@ void triangle(Vec2i vertices[3], TGAImage& image, const TGAColor& color, bool wi
 	}
 }
 
+void triangle(Vec3f vertices[3], float *zbuffer, TGAImage& image, const TGAColor& color) {
+    Vec2f bboxmin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+    Vec2f bboxmax(std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
+    Vec2f clamp(image.get_width()-1, image.get_height()-1);
+    for (int i=0; i<3; i++) {
+        bboxmin.x = std::max(0.f,     std::min(bboxmin.x, vertices[i].x));
+        bboxmin.y = std::max(0.f,     std::min(bboxmin.y, vertices[i].y));
+
+        bboxmax.x = std::min(clamp.x, std::max(bboxmax.x, vertices[i].x));
+        bboxmax.y = std::min(clamp.y, std::max(bboxmax.y, vertices[i].y));
+    }
+
+    Vec3f P;
+    for (P.x=bboxmin.x; P.x<=bboxmax.x; P.x++) {
+        for (P.y=bboxmin.y; P.y<=bboxmax.y; P.y++) {
+            Vec3f bc  = barycentric_coordinates(vertices, P);
+            if (bc.x < 0.f || bc.y < 0.f || bc.z < 0.f) continue;
+            P.z = 0.f;
+			P.z += vertices[0].z*bc.x;
+			P.z += vertices[1].z*bc.y;
+			P.z += vertices[2].z*bc.z;
+            if (zbuffer[int(P.x+P.y*width)] < P.z) {
+                zbuffer[int(P.x+P.y*width)] = P.z;
+                image.set(P.x, P.y, color);
+            }
+        }
+    }
+}
+
+void textured_triangle(Vec3f vertices[3], Vec3f uvs[3], float *zbuffer, TGAImage& image, TGAImage& texture) {
+    Vec2f bboxmin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+    Vec2f bboxmax(std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
+    Vec2f clamp(image.get_width()-1, image.get_height()-1);
+    for (int i=0; i<3; i++) {
+        bboxmin.x = std::max(0.f,     std::min(bboxmin.x, vertices[i].x));
+        bboxmin.y = std::max(0.f,     std::min(bboxmin.y, vertices[i].y));
+
+        bboxmax.x = std::min(clamp.x, std::max(bboxmax.x, vertices[i].x));
+        bboxmax.y = std::min(clamp.y, std::max(bboxmax.y, vertices[i].y));
+    }
+
+    Vec3f P;
+    for (P.x=bboxmin.x; P.x<=bboxmax.x; P.x++) {
+        for (P.y=bboxmin.y; P.y<=bboxmax.y; P.y++) {
+            Vec3f bc  = barycentric_coordinates(vertices, P);
+            if (bc.x < 0.f || bc.y < 0.f || bc.z < 0.f) continue;
+            P.z = 0.f;
+
+            P.z += vertices[0].z*bc.x;
+            P.z += vertices[1].z*bc.y;
+            P.z += vertices[2].z*bc.z;
+            if (zbuffer[int(P.x+P.y*width)] < P.z) {
+                zbuffer[int(P.x+P.y*width)] = P.z;
+
+                Vec3f texcoords = Vec3f(
+                    (int)((uvs[0].x*bc.x + uvs[1].x*bc.y + uvs[2].x*bc.z)*texture.get_width()),
+                    (int)((uvs[0].y*bc.x + uvs[1].y*bc.y + uvs[2].y*bc.z)*texture.get_height()),
+                    0.f
+                );
+
+                TGAColor color = texture.get(texcoords.x, texcoords.y);
+                image.set(P.x, P.y, color);
+            }
+        }
+    }
+}
+
+void textured_lighted_triangle(Vec3f vertices[3], Vec3f uvs[3], float *zbuffer, TGAImage& image, TGAImage& texture, float intensity) {
+    Vec2f bboxmin(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+    Vec2f bboxmax(std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
+    Vec2f clamp(image.get_width()-1, image.get_height()-1);
+    for (int i=0; i<3; i++) {
+        bboxmin.x = std::max(0.f,     std::min(bboxmin.x, vertices[i].x));
+        bboxmin.y = std::max(0.f,     std::min(bboxmin.y, vertices[i].y));
+
+        bboxmax.x = std::min(clamp.x, std::max(bboxmax.x, vertices[i].x));
+        bboxmax.y = std::min(clamp.y, std::max(bboxmax.y, vertices[i].y));
+    }
+
+    Vec3f P;
+    for (P.x=bboxmin.x; P.x<=bboxmax.x; P.x++) {
+        for (P.y=bboxmin.y; P.y<=bboxmax.y; P.y++) {
+            Vec3f bc  = barycentric_coordinates(vertices, P);
+            if (bc.x < 0.f || bc.y < 0.f || bc.z < 0.f) continue;
+            P.z = 0.f;
+
+            P.z += vertices[0].z*bc.x;
+            P.z += vertices[1].z*bc.y;
+            P.z += vertices[2].z*bc.z;
+            if (zbuffer[int(P.x+P.y*width)] < P.z) {
+                zbuffer[int(P.x+P.y*width)] = P.z;
+
+                Vec3f texcoords = Vec3f(
+                    (int)((uvs[0].x*bc.x + uvs[1].x*bc.y + uvs[2].x*bc.z)*texture.get_width()),
+                    (int)((uvs[0].y*bc.x + uvs[1].y*bc.y + uvs[2].y*bc.z)*texture.get_height()),
+                    0.f
+                );
+
+                TGAColor color = texture.get(texcoords.x, texcoords.y);
+                color.r *= intensity;
+                color.g *= intensity;
+                color.b *= intensity;
+                image.set(P.x, P.y, color);
+            }
+        }
+    }
+}
+
 void draw_model_random_colors(const Model& model, TGAImage& image) {
 	for (int i = 0; i < model.nfaces(); i++) {
 		std::vector<int> face = model.face(i);
 		Vec2i screen_coords[3];
 		for (int j = 0; j < 3; j++) {
-			Vec3f world_coords = model.vert(face[j]);
+			Vec3f world_coords = model.vert(face[3*j + 0]);
 			screen_coords[j] = Vec2i((world_coords.x+1.)*width/2., (world_coords.y+1.)*height/2.);
 		}
 		TGAColor color(std::rand()%255, std::rand()%255, std::rand()%255, 255);
@@ -117,7 +230,7 @@ void draw_model_lighted(const Model& model, TGAImage& image, Vec3f light_dir) {
 		Vec2i screen_coords[3];
 		Vec3f world_coords[3];
 		for (int j = 0; j < 3; j++) {
-			Vec3f v = model.vert(face[j]);
+			Vec3f v = model.vert(face[3*j + 0]);
 			screen_coords[j] = Vec2i((v.x+1.)*width/2., (v.y+1.)*height/2.);
 			world_coords[j] = v;
 		}
@@ -127,6 +240,75 @@ void draw_model_lighted(const Model& model, TGAImage& image, Vec3f light_dir) {
 		if (intensity > 0) {
 			TGAColor color(intensity*255, intensity*255, intensity*255, 255);
 			triangle(screen_coords, image, color);
+		}
+	}
+}
+
+void draw_model_lighted_zbuffer(const Model& model, float *zbuffer, TGAImage& image, Vec3f light_dir) {
+	for (int i = 0; i < model.nfaces(); i++) {
+		std::vector<int> face = model.face(i);
+		Vec3f screen_coords[3];
+		Vec3f world_coords[3];
+		for (int j = 0; j < 3; j++) {
+			Vec3f v = model.vert(face[3*j + 0]);
+			screen_coords[j] = Vec3f(
+				(int)((v.x+1.)*width/2. + 0.5f), 
+				(int)((v.y+1.)*height/2. + 0.5f), 
+				v.z);
+			world_coords[j] = v;
+		}
+		Vec3f normal = (world_coords[2] - world_coords[0])^(world_coords[1]-world_coords[0]);
+		normal.normalize();
+		float intensity = normal * light_dir;
+		if (intensity > 0) {
+			TGAColor color(intensity*255, intensity*255, intensity*255, 255);
+			triangle(screen_coords, zbuffer, image, color);
+		}
+	}
+}
+
+void draw_model_zbuffer_textured(const Model& model, float *zbuffer, TGAImage& image, TGAImage& texture) {
+	for (int i = 0; i < model.nfaces(); i++) {
+		std::vector<int> face = model.face(i);
+		Vec3f screen_coords[3];
+		Vec3f uvs[3];
+		Vec3f world_coords[3];
+		for (int j = 0; j < 3; j++) {
+			Vec3f v = model.vert(face[3*j + 0]);
+			screen_coords[j] = Vec3f(
+				(int)((v.x+1.)*width/2. + 0.5f), 
+				(int)((v.y+1.)*height/2. + 0.5f), 
+				v.z);
+            uvs[j] = model.uv(face[3*j + 1]);
+			world_coords[j] = v;
+		}
+		
+        textured_triangle(screen_coords, uvs, zbuffer, image, texture);
+	}
+}
+
+void draw_model_zbuffer_textured_lighted(const Model& model, float *zbuffer, TGAImage& image, TGAImage& texture, Vec3f light_dir) {
+	for (int i = 0; i < model.nfaces(); i++) {
+		std::vector<int> face = model.face(i);
+		Vec3f screen_coords[3];
+		Vec3f uvs[3];
+		Vec3f world_coords[3];
+		for (int j = 0; j < 3; j++) {
+			Vec3f v = model.vert(face[3*j + 0]);
+			screen_coords[j] = Vec3f(
+				(int)((v.x+1.)*width/2. + 0.5f), 
+				(int)((v.y+1.)*height/2. + 0.5f), 
+				v.z);
+            uvs[j] = model.uv(face[3*j + 1]);
+			world_coords[j] = v;
+		}
+		
+		Vec3f normal = (world_coords[2] - world_coords[0])^(world_coords[1]-world_coords[0]);
+		normal.normalize();
+		float intensity = normal * light_dir;
+		if (intensity > 0) {
+			TGAColor color(intensity*255, intensity*255, intensity*255, 255);
+			textured_lighted_triangle(screen_coords, uvs, zbuffer, image, texture, intensity);
 		}
 	}
 }
@@ -147,15 +329,7 @@ void draw_wireframe(const Model& model, TGAImage& image, const TGAColor& color) 
 }
 
 int main(int argc, char** argv) {
-	// TGAImage image(100, 100, TGAImage::RGB);
-	// image.set(52, 41, red);
-	// line(10, 10, 60, 80, image, red);
-	// line(20, 20, 60, 40, image, green);
-	// fill_border(image, white);
-	// image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
-	// image.write_tga_file("output.tga");
-	// return 0;
-	
+	Model *model = nullptr;
 	if (argc == 2) {
 		model = new Model(argv[1]);
 	} else {
@@ -163,27 +337,34 @@ int main(int argc, char** argv) {
 	}
 
 	TGAImage image(width, height, TGAImage::RGB);
+	TGAImage texture;
+	if (!texture.read_tga_file("african_head_diffuse.tga")) {
+		std::cerr << "Failed to open tga file\n";
+	}
+    texture.flip_vertically();
 	fill_border(image, blue, 2);
 	// draw_model_random_colors(*model, image);
-	draw_model_lighted(*model, image, Vec3f(0.f, 0.f, -1.f));
+	float *zbuffer = new float[width * height];
+	for (int i = 0; i < width * height; i++) {
+		zbuffer[i] = -std::numeric_limits<float>::max();
+	}
+	// draw_model_lighted(*model, image, Vec3f(0.f, 0.f, -1.f));
+	// draw_model_lighted_zbuffer(*model, zbuffer, image, Vec3f(0.f, 0.f, -1.f));
+	// draw_model_zbuffer_textured(*model, zbuffer, image, texture);
+	draw_model_zbuffer_textured_lighted(*model, zbuffer, image, texture, Vec3f(0.f, 0.f, -1.f));
 	// draw_wireframe(*model, image, green);
 	
 	// Vec2i t0[3] = {Vec2i(10, 70),   Vec2i(50, 160),  Vec2i(70, 80)}; 
 	// Vec2i t1[3] = {Vec2i(180, 50),  Vec2i(150, 1),   Vec2i(70, 180)}; 
 	// Vec2i t2[3] = {Vec2i(180, 150), Vec2i(120, 160), Vec2i(130, 180)}; 
-	// triangle(t0[0], t0[1], t0[2], image, red); 
-	// triangle(t1[0], t1[1], t1[2], image, white); 
-	// triangle(t2[0], t2[1], t2[2], image, green);
 	// triangle(t0, image, red);
 	// triangle(t1, image, white);
 	// triangle(t2, image, green);
-	// triangle(t0[0], t0[1], t0[2], image, green, true); 
-	// triangle(t1[0], t1[1], t1[2], image, blue, true); 
-	// triangle(t2[0], t2[1], t2[2], image, red, true);
 
 	image.flip_vertically();
 	image.write_tga_file("output.tga");
 	delete model;
+	delete[] zbuffer;
 	return 0;
 }
 
