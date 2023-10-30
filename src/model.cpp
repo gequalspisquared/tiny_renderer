@@ -20,20 +20,20 @@ Model::Model(const char *filename) : m_verts() , m_faces() {
 
 		if (!line.compare(0, 2, "v ")) {
 			iss >> trash;
-			Vec3f v;
-			for (int i = 0; i < 3; i++) iss >> v.raw[i];
+			glm::vec3 v;
+			for (int i = 0; i < 3; i++) iss >> v[i];
 			m_verts.push_back(v);
 		} else if (!line.compare(0, 3, "vt ")) {
 			iss >> trash;
 			iss >> trash;
-			Vec3f uv;
-			for (int i = 0; i < 3; i++) iss >> uv.raw[i];
+			glm::vec3 uv;
+			for (int i = 0; i < 3; i++) iss >> uv[i];
 			m_uvs.push_back(uv);
 		} else if (!line.compare(0, 3, "vn ")) {
 			iss >> trash;
 			iss >> trash;
-			Vec3f norm;
-			for (int i = 0; i < 3; i++) iss >> norm.raw[i];
+			glm::vec3 norm;
+			for (int i = 0; i < 3; i++) iss >> norm[i];
 			m_norms.push_back(norm);
 		} else if (!line.compare(0, 2, "f ")) {
 			std::vector<int> f, uv;
@@ -73,15 +73,15 @@ int Model::nfaces() const {
 	return m_faces.size();
 }
 
-Vec3f Model::vert(int idx) const {
+glm::vec3 Model::vert(int idx) const {
 	return m_verts[idx];
 }
 
-Vec3f Model::uv(int idx) const {
+glm::vec3 Model::uv(int idx) const {
 	return m_uvs[idx];
 }
 
-Vec3f Model::norm(int idx) const {
+glm::vec3 Model::norm(int idx) const {
 	return m_norms[idx];
 }
 

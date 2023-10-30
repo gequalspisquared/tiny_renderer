@@ -1,28 +1,31 @@
 SYSCONF_LINK = g++
-CPPFLAGS     =
-LDFLAGS      =
+CPPFLAGS     = -Ilib/glm/ -Isrc/
+LDFLAGS      = 
 LIBS         = -lm
 
-DESTDIR = ./bin/
+BIN_DIR = bin
 TARGET  = main
+EXECUTABLE = $(BIN_DIR)/$(TARGET)
 
-OBJDIR := ./obj/
-OBJECTS := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
-OBJECTS := $(addprefix $(OBJDIR), $(OBJECTS))
+SRC_DIR   = src
+SRC_FILES = $(wildcard $(SRC_DIR)/*.cpp)
+OBJ_DIR   = obj
+OBJ_FILES = $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRC_FILES))
 
-all: $(DESTDIR)$(TARGET)
+.PHONY: all clean
 
-run: $(DESTDIR)$(TARGET)
-	./$(DESTDIR)$(TARGET) && feh -Z -F --force-aliasing output.tga
+all: $(EXECUTABLE)
 
-$(DESTDIR)$(TARGET): $(OBJECTS)
-	$(SYSCONF_LINK) -Wall $(LDFLAGS) -o $(DESTDIR)$(TARGET) $(OBJECTS) $(LIBS)
+run: all
+	./$(EXECUTABLE) && feh -Z -F --force-aliasing output.tga
 
-$(OBJECTS): $(OBJDIR)%.o: %.cpp
+$(EXECUTABLE): $(OBJ_FILES)
+	$(SYSCONF_LINK) -Wall $(LDFLAGS) -o $(EXECUTABLE) $(OBJ_FILES) $(LIBS)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(SYSCONF_LINK) -Wall $(CPPFLAGS) -c $(CFLAGS) $< -o $@
 
 clean:
 	-rm -f $(OBJECTS)
-	-rm -f $(TARGET)
-	-rm -f *.tga
-
+	-rm -f $(EXECUTABLE)
+	# -rm -f *.tga
