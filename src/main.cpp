@@ -6,6 +6,7 @@
 #include "tgaimage.h"
 // #include "geometry.h"
 #include "glm/glm.hpp"
+#include "glm/gtx/string_cast.hpp"
 #include "model.h"
 
 const int width = 800;
@@ -212,6 +213,7 @@ void textured_lighted_triangle(glm::vec3 vertices[3], glm::vec3 uvs[3], float *z
                 color.r *= intensity;
                 color.g *= intensity;
                 color.b *= intensity;
+                // color = white;
                 image.set(P.x, P.y, color);
             }
         }
@@ -329,6 +331,72 @@ void draw_model_zbuffer_textured_lighted(const Model& model, float *zbuffer, TGA
     }
 }
 
+glm::mat4 Viewport(int x, int y, int w, int h) {
+    glm::mat4 m = glm::mat4(1.f);
+    int depth = 255;
+    m[0][3] = x+w/2.f;
+    m[1][3] = y+h/2.f;
+    m[2][3] = depth/2.f;
+
+    m[0][0] = w/2.f;
+    m[1][1] = h/2.f;
+    m[2][2] = depth/2.f;
+    return m;
+}
+
+void draw_model_zbuffer_textured_lighted_perspective(const Model& model, float *zbuffer, TGAImage& image, TGAImage& texture, glm::vec3 light_dir) {
+    // glm::mat4 viewport = Viewport(0, 0, width, height);
+    glm::mat4 perspective = glm::mat4(1.0f);
+    perspective[2][3] = -1/3.f;
+    glm::mat4 viewport = glm::mat4(0.f);
+    viewport[0][0] = width/2.f;
+    viewport[1][1] = height/2.f;
+    viewport[2][2] = 255/2.f;
+
+    viewport[3][0] = width/2.f + 0.5f;
+    viewport[3][1] = height/2.f + 0.5f;
+    viewport[3][2] = 255/2.f + 0.5f;
+    viewport[3][3] = 1.f;
+    for (int i = 0; i < model.nfaces(); i++) {
+        std::vector<int> face = model.face(i);
+        glm::vec3 screen_coords[3];
+        glm::vec3 uvs[3];
+        glm::vec3 world_coords[3];
+        for (int j = 0; j < 3; j++) {
+            glm::vec3 v = model.vert(face[3*j + 0]);
+            // screen_coords[j] = glm::vec3(
+            //     (int)((v.x+1.)*width/2. + 0.5f), 
+            //     (int)((v.y+1.)*height/2. + 0.5f), 
+            //     v.z);
+            screen_coords[j] = v;
+            uvs[j] = model.uv(face[3*j + 1]);
+            world_coords[j] = v;
+        }
+
+        glm::vec3 normal = glm::cross(
+            world_coords[2] - world_coords[0],
+            world_coords[1] - world_coords[0]
+        );
+        normal = glm::normalize(normal);
+        float intensity = glm::dot(normal, light_dir);
+        if (intensity > 0) {
+
+            // transformations
+            for (int j = 0; j < 3; j++) {
+                glm::vec4 v4(screen_coords[j].x, screen_coords[j].y, screen_coords[j].z, 1.f);
+                // v4 = viewport*v4;
+                v4 = viewport*perspective*v4;
+                screen_coords[j].x = (int)(v4.x/v4.w);
+                screen_coords[j].y = (int)(v4.y/v4.w);
+                screen_coords[j].z = v4.z/v4.w;
+            }
+
+            TGAColor color(intensity*255, intensity*255, intensity*255, 255);
+            textured_lighted_triangle(screen_coords, uvs, zbuffer, image, texture, intensity);
+        }
+    }
+}
+
 void draw_wireframe(const Model& model, TGAImage& image, const TGAColor& color) {
     for (int i = 0; i < model.nfaces(); i++) {
         std::vector<int> face = model.face(i);
@@ -367,7 +435,8 @@ int main(int argc, char** argv) {
     // draw_model_lighted(*model, image, glm::vec3(0.f, 0.f, -1.f));
     // draw_model_lighted_zbuffer(*model, zbuffer, image, glm::vec3(0.f, 0.f, -1.f));
     // draw_model_zbuffer_textured(*model, zbuffer, image, texture);
-    draw_model_zbuffer_textured_lighted(*model, zbuffer, image, texture, glm::vec3(0.f, 0.f, -1.f));
+    // draw_model_zbuffer_textured_lighted(*model, zbuffer, image, texture, glm::vec3(0.f, 0.f, -1.f));
+    draw_model_zbuffer_textured_lighted_perspective(*model, zbuffer, image, texture, glm::vec3(0.f, 0.f, -1.f));
     // draw_wireframe(*model, image, green);
 
     // glm::ivec2 t0[3] = {Vec2i(10, 70),   Vec2i(50, 160),  Vec2i(70, 80)}; 

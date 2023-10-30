@@ -26,6 +26,6 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(SYSCONF_LINK) -Wall $(CPPFLAGS) -c $(CFLAGS) $< -o $@
 
 clean:
-	-rm -f $(OBJECTS)
+	-rm -f $(OBJ_FILES)
 	-rm -f $(EXECUTABLE)
 	# -rm -f *.tga
