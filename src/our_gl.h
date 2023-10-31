@@ -1,16 +1,16 @@
-#ifndef HEADER_H
-#define HEADER_H
+#ifndef OUR_GL_H
+#define OUR_GL_H
 
 #include "tgaimage.h"
-#include "glm/glm.hpp"
+#include "model.h"
 
-extern glm::mat4 view;
-extern glm::mat4 viewport;
+extern glm::mat4 model_view;
 extern glm::mat4 projection;
+extern glm::mat4 viewport;
 
-void create_viewport(int w, int h);
-void create_projection(float coeff = 0.f); // coeff = -1/c 
 void look_at(glm::vec3 eye, glm::vec3 center, glm::vec3 up);
+void create_projection(const glm::vec3 &eye, const glm::vec3 &center);
+void create_viewport(int w, int h);
 
 struct Shader {
     virtual ~Shader();
@@ -18,6 +18,6 @@ struct Shader {
     virtual bool fragment(glm::vec3 bar, TGAColor &color) = 0;
 };
 
-void triangle(glm::vec4 *vertices, Shader &shader, TGAImage &image, TGAImage &zbuffer);
+void triangle(glm::vec4 verts[3], Shader &shader, TGAImage &image, TGAImage &zbuffer);
 
 #endif
