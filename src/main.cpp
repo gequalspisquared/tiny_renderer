@@ -18,11 +18,17 @@ glm::vec3 up(0.f, 1.f, 0.f);
 
 struct GouraudShader : public Shader {
 	glm::vec3 varying_intensity;
+	glm::mat3x2 varying_uv;
 
 	virtual glm::vec4 vertex(int iface, int nthvert) {
 		std::vector<int> face = model->face(iface);
+
 		glm::vec3 norm = model->norm(face[nthvert + 2]);
 		varying_intensity[nthvert/3] = std::max(0.f, glm::dot(norm, light_dir));
+
+		glm::vec3 curr_uv = model->uv(face[nthvert + 1]);
+		varying_uv[nthvert/3] = {curr_uv.x, curr_uv.y};
+
 		glm::vec3 v = model->vert(face[nthvert]);
 		glm::vec4 gl_Vertex(v.x, v.y, v.z, 1.f);
 		gl_Vertex = viewport*projection*model_view*gl_Vertex;
@@ -34,7 +40,9 @@ struct GouraudShader : public Shader {
 		if (intensity < 0.f) {
 			return true;
 		}
-		color = TGAColor(255, 255, 255)*intensity;
+		glm::vec2 uv = (varying_uv * bc);
+		// color = TGAColor(255, 255, 255)*intensity;
+		color = model->diffuse_color(uv) * intensity;
 		return false;
 	}
 };
@@ -45,6 +53,14 @@ int main(int argc, char** argv) {
 	} else {
 		model = new Model("african_head.obj");
 	}
+	TGAImage texture;
+	if (!texture.read_tga_file("african_head_diffuse.tga")) {
+		std::cout << "Failed to load diffuse texture\n";
+		delete model;
+		return 1;
+	}
+	texture.flip_vertically();
+	model->set_diffuse_texture(texture);
 
 	look_at(eye, center, up);
 	create_projection(eye, center);

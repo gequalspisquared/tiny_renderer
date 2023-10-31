@@ -88,3 +88,15 @@ glm::vec3 Model::norm(int idx) const {
 std::vector<int> Model::face(int idx) const {
 	return m_faces[idx];
 }
+
+void Model::set_diffuse_texture(TGAImage &texture) {
+	m_diffuse_texture = texture;
+	m_has_texture = true;
+}
+
+TGAColor Model::diffuse_color(glm::vec2& uv) {
+	return m_diffuse_texture.get(
+		(int)(uv.x*m_diffuse_texture.get_width()),
+		(int)(uv.y*m_diffuse_texture.get_height())
+	);
+}

@@ -25,7 +25,6 @@ void look_at(glm::vec3 eye, glm::vec3 center, glm::vec3 up) {
 void create_projection(const glm::vec3 &eye, const glm::vec3 &center) {
 	projection = glm::mat4(1.0f);
 	projection[2][3] = -1.f/(eye - center).length();
-	// projection[2][3] = -1.f/1000.f;
 }
 
 void create_viewport(int w, int h) {
@@ -77,6 +76,7 @@ void triangle(glm::vec4 vertices[3], Shader &shader, TGAImage& image, TGAImage& 
 			float w = vertices[0].w*bc.x + vertices[1].w*bc.y + vertices[2].w*bc.z;
 
 			int frag_depth = std::max(0, std::min(255, (int)(z/w + 0.5f)));
+			// int frag_depth = std::max(0, std::min(255, (int)(z + 0.5f)));
 			if (zbuffer.get(P.x, P.y)[0] > frag_depth) continue;
 			TGAColor color;
 			bool discard = shader.fragment(bc, color);
