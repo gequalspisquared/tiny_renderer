@@ -91,7 +91,17 @@ std::vector<int> Model::face(int idx) const {
 
 void Model::set_diffuse_texture(TGAImage &texture) {
 	m_diffuse_texture = texture;
-	m_has_texture = true;
+	m_has_diffuse_texture = true;
+}
+
+void Model::set_normal_texture(TGAImage &texture) {
+	m_normal_texture = texture;
+	m_has_normal_texture = true;
+}
+
+void Model::set_specular_texture(TGAImage &texture) {
+	m_specular_texture = texture;
+	m_has_specular_texture = true;
 }
 
 TGAColor Model::diffuse_color(glm::vec2& uv) {
@@ -99,4 +109,24 @@ TGAColor Model::diffuse_color(glm::vec2& uv) {
 		(int)(uv.x*m_diffuse_texture.get_width()),
 		(int)(uv.y*m_diffuse_texture.get_height())
 	);
+}
+
+glm::vec4 Model::normal_from_texture(glm::vec2& uv) {
+	TGAColor norm = m_normal_texture.get(
+		(int)(uv.x*m_normal_texture.get_width()),
+		(int)(uv.y*m_normal_texture.get_height())
+	);
+	glm::vec4 res(1.f);
+	for (int i = 0; i < 3; i++) {
+		res[2-i] = (float)norm[i]/255.f*2.f - 1.f;
+	}
+	return res;
+}
+
+float Model::specular(glm::vec2& uv) {
+	TGAColor specular = m_specular_texture.get(
+		(int)(uv.x*m_normal_texture.get_width()),
+		(int)(uv.y*m_normal_texture.get_height())
+	);
+	return specular[0];
 }
