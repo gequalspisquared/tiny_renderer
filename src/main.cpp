@@ -103,6 +103,7 @@ int main(int argc, char** argv) {
 	TGAImage zbuffer(width, height, TGAImage::GRAYSCALE);
 
 	GouraudShader shader;
+	// Eventually add 2 pass rendering to computer shadow buffer
 	for (int iface = 0; iface < model->nfaces(); iface++) {
 		glm::vec4 screen_coords[3];
 		for (int j = 0; j < 3; j++) {
